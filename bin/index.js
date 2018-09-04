@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const npx = require('../')
+const npx = require('libnpx-patch')
 const path = require('path')
 
 const NPM_PATH = path.join(__dirname, 'node_modules', 'npm', 'bin', 'npm-cli.js')
