@@ -122,7 +122,8 @@ function fastPathArgs (argv, defaultNpm) {
     p: pkg,
     shell: false,
     noYargs: true,
-    npm: defaultNpm || 'npm'
+    npm: defaultNpm || 'npm',
+    target: argv.target
   }
 }
 
@@ -226,6 +227,14 @@ function yargsParser (argv, defaultNpm) {
       alias: 'n',
       type: 'string',
       describe: Y()`Extra node argument when calling a node binary.`
+    })
+    .option('list-cache', {
+      type: 'string',
+      describe: Y()`List all available cache.`
+    })
+    .option('delete-cache', {
+      type: 'boolean',
+      describe: Y()`delete cache base on specified package name.`
     })
     .version()
     .alias('version', 'v')

@@ -8,10 +8,62 @@ const fs = require('fs')
 const parseArgs = require('./parse-args.js')
 const path = require('path')
 const which = promisify(require('which'))
+const fsExtra = require('fs-extra')
+const glob = require('glob')
+const os = require('os')
 
 module.exports = npx
 module.exports.parseArgs = parseArgs
+
+/**
+ * 处理列举所有的情况
+ */
+function handleListCacheCase (argv) {
+  const listCache = argv['list-cache']
+  if (listCache) {
+    const cache = argv['cache']
+    const prefix = resolvePrefixPath(cache, `*${listCache}*`)
+    console.log(Y()`${glob.sync(prefix, {noglobstar: true}).join(os.EOL)}`)
+    return true
+  }
+  return false
+}
+
+/**
+ * 处理删除 cache 的情况
+ * @param argv
+ * @return {boolean}
+ */
+function handleDeleteCacheCase (argv) {
+  let delCache = argv['delete-cache']
+  if (delCache) {
+    /**
+     * 忽略 @xfe/xxx 的情况, 所以是 > 0, 而不是 > -1
+     */
+    if (delCache.indexOf('@') > 0) {
+      delCache = `${delCache}@latest`
+    }
+    const prefix = resolvePrefixPath(argv['cache'], delCache)
+    if (fsExtra.existsSync(prefix)) {
+      require('rimraf')(prefix, err => {
+        if (err) {
+          throw err
+        }
+        console.log(Y()`remove successfully: ${prefix}.`)
+      })
+    } else {
+      console.error(Y()`folder does not exist: ${prefix}.`)
+    }
+    return true
+  } else {
+    return false
+  }
+}
+
 function npx (argv) {
+  if (handleListCacheCase(argv) || handleDeleteCacheCase(argv)) {
+    return
+  }
   const shell = argv['shell-auto-fallback']
   if (shell || shell === '') {
     const fallback = require('./auto-fallback.js')(
@@ -72,9 +124,7 @@ function npx (argv) {
         // Some npm packages need to be installed. Let's install them!
         return ensurePackages(argv.package, argv).then(results => {
           if (results && results.added && results.updated && !argv.q) {
-            console.error(Y()`npx: installed ${
-              results.added.length + results.updated.length
-            } in ${(Date.now() - startTime) / 1000}s`)
+            console.error(Y()`npx: installed ${results.added.length + results.updated.length} in ${(Date.now() - startTime) / 1000}s`)
           }
           if (
             argv.command &&
@@ -117,6 +167,7 @@ function npx (argv) {
 }
 
 module.exports._localBinPath = localBinPath
+
 function localBinPath (cwd) {
   return require('./get-prefix.js')(cwd).then(prefix => {
     return prefix && path.join(prefix, 'node_modules', '.bin')
@@ -124,6 +175,7 @@ function localBinPath (cwd) {
 }
 
 module.exports._getEnv = getEnv
+
 function getEnv (opts) {
   const args = ['run', 'env', '--parseable']
   return findNodeScript(opts.npm, {isLocal: true}).then(npmPath => {
@@ -138,33 +190,44 @@ function getEnv (opts) {
   }).then(require('dotenv').parse)
 }
 
+function resolvePrefixPath (cache, packageName = '') {
+  if (!cache) {
+    cache = path.resolve(__dirname, 'cache')
+  }
+  return path.join(cache, '_npx', packageName)
+}
+
 module.exports._ensurePackages = ensurePackages
+
 function ensurePackages (specs, opts) {
-  return (
-    opts.cache ? Promise.resolve(opts.cache) : getNpmCache(opts)
-  ).then(cache => {
-    const prefix = path.join(cache, '_npx', process.pid.toString())
-    const bins = process.platform === 'win32'
-      ? prefix
-      : path.join(prefix, 'bin')
-    const rimraf = require('rimraf')
-    process.on('exit', () => rimraf.sync(prefix))
-    return promisify(rimraf)(bins).then(() => {
-      return installPackages(specs, prefix, opts)
-    }).then(info => {
-      // This will make temp bins _higher priority_ than even local bins.
-      // This is intentional, since npx assumes that if you went through
-      // the trouble of doing `-p`, you're rather have that one. Right? ;)
-      process.env.PATH = `${bins}${path.delimiter}${process.env.PATH}`
-      if (!info) { info = {} }
-      info.prefix = prefix
-      info.bin = bins
-      return info
-    })
+  return Promise.resolve().then(() => {
+    const prefix = resolvePrefixPath(opts.cache, specs[0])
+    if (fsExtra.existsSync(prefix)) {
+      return {
+        prefix: prefix,
+        bin: prefix
+      }
+    } else {
+      fsExtra.ensureDirSync(prefix)
+      return installPackages(specs, prefix, opts).then(info => {
+        // This will make temp bins _higher priority_ than even local bins.
+        // This is intentional, since npx assumes that if you went through
+        // the trouble of doing `-p`, you're rather have that one. Right? ;)
+        process.env.PATH = `${prefix}${path.delimiter}${process.env.PATH}`
+        if (!info) { info = {} }
+        info.prefix = prefix
+        info.bin = prefix
+        return info
+      }).catch(e => {
+        fsExtra.removeSync(prefix)
+        throw e
+      })
+    }
   })
 }
 
 module.exports._getExistingPath = getExistingPath
+
 function getExistingPath (command, opts) {
   if (opts.isLocal) {
     return Promise.resolve(command)
@@ -187,6 +250,7 @@ function getExistingPath (command, opts) {
 }
 
 module.exports._getNpmCache = getNpmCache
+
 function getNpmCache (opts) {
   const args = ['config', 'get', 'cache', '--parseable']
   if (opts.userconfig) {
@@ -206,6 +270,7 @@ function getNpmCache (opts) {
 }
 
 module.exports._buildArgs = buildArgs
+
 function buildArgs (specs, prefix, opts) {
   const args = ['install'].concat(specs)
   args.push('--global', '--prefix', prefix)
@@ -217,6 +282,7 @@ function buildArgs (specs, prefix, opts) {
 }
 
 module.exports._installPackages = installPackages
+
 function installPackages (specs, prefix, opts) {
   const args = buildArgs(specs, prefix, opts)
   return findNodeScript(opts.npm, {isLocal: true}).then(npmPath => {
@@ -251,6 +317,7 @@ function installPackages (specs, prefix, opts) {
 }
 
 module.exports._execCommand = execCommand
+
 function execCommand (_existing, argv) {
   return findNodeScript(_existing, argv).then(existing => {
     const argvCmdOpts = argv.cmdOpts || []
@@ -292,7 +359,7 @@ function execCommand (_existing, argv) {
         }, [])
         cmdOpts = cmdOpts.concat(existing, argvCmdOpts)
       }
-      const opts = Object.assign({}, argv, { cmdOpts })
+      const opts = Object.assign({}, argv, {cmdOpts})
       return child.runCommand(cmd, opts).catch(err => {
         if (err.isOperational && err.exitCode) {
           // At this point, we want to treat errors from the child as if
@@ -308,6 +375,7 @@ function execCommand (_existing, argv) {
 }
 
 module.exports._findNodeScript = findNodeScript
+
 function findNodeScript (existing, opts) {
   if (!existing) {
     return Promise.resolve(false)

@@ -2,6 +2,12 @@
 
 # npx(1) -- execute npm package binaries
 
+## FORK CHANGES
+
+1. 默认支持缓存特性, 可根据版本号自行缓存
+2. 提供 `--list-cache` 查看缓存, 支持通配符, 默认情况使用 `--list-cache *` 查看全部, 如需搜索如cowsay, 可直接 `--list-cache cowsay`
+3. 提供 `--delete-cache` 删除指定缓存, 支持通配符, 如需删除所有缓存 `--delete-cache *`, 删除指定缓存可以使用 `--delete-cache cowsay@1.1.1`, 在没有指定版本时默认删除@lastest.
+
 ## SYNOPSIS
 
 `npx [options] <command>[@version] [command-arg]...`
