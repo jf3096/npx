@@ -22,8 +22,16 @@ function handleListCacheCase (argv) {
   const listCache = argv['list-cache']
   if (listCache) {
     const cache = argv['cache']
-    const prefix = resolvePrefixPath(cache, `*${listCache}*`)
-    console.log(Y()`${glob.sync(prefix, {noglobstar: true}).join(os.EOL)}`)
+    const prefix = resolvePrefixPath(cache, `${listCache}`)
+    const filenames = glob.sync(prefix, {noglobstar: true}).map(filename => {
+      const dirname = path.basename(path.dirname(filename))
+      const basename = path.basename(filename)
+      if (dirname.indexOf('@') === 0) {
+        return `${dirname}/${basename}`
+      }
+      return basename
+    })
+    console.log(Y()`${filenames.join(os.EOL)}`)
     return true
   }
   return false
@@ -202,6 +210,7 @@ module.exports._ensurePackages = ensurePackages
 function ensurePackages (specs, opts) {
   return Promise.resolve().then(() => {
     const prefix = resolvePrefixPath(opts.cache, specs[0])
+    let hasFinishInstalled = false
     if (fsExtra.existsSync(prefix)) {
       return {
         prefix: prefix,
@@ -209,6 +218,8 @@ function ensurePackages (specs, opts) {
       }
     } else {
       fsExtra.ensureDirSync(prefix)
+      process.on('SIGINT', () => process.exit())
+      process.on('exit', () => hasFinishInstalled || fsExtra.removeSync(prefix))
       return installPackages(specs, prefix, opts).then(info => {
         // This will make temp bins _higher priority_ than even local bins.
         // This is intentional, since npx assumes that if you went through
@@ -217,10 +228,8 @@ function ensurePackages (specs, opts) {
         if (!info) { info = {} }
         info.prefix = prefix
         info.bin = prefix
+        hasFinishInstalled = true
         return info
-      }).catch(e => {
-        fsExtra.removeSync(prefix)
-        throw e
       })
     }
   })
