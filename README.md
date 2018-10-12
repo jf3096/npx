@@ -1,6 +1,6 @@
 [![npm](https://img.shields.io/npm/v/npx.svg)](https://npm.im/npx) [![license](https://img.shields.io/npm/l/npx.svg)](https://npm.im/npx) [![Travis](https://img.shields.io/travis/zkat/npx.svg)](https://travis-ci.org/zkat/npx) [![AppVeyor](https://ci.appveyor.com/api/projects/status/github/zkat/npx?svg=true)](https://ci.appveyor.com/project/zkat/npx) [![Coverage Status](https://coveralls.io/repos/github/zkat/npx/badge.svg?branch=latest)](https://coveralls.io/github/zkat/npx?branch=latest)
 
-# npx(1) -- execute npm package binaries
+# xpx(1) -- execute npm package binaries
 
 ## FORK CHANGES
 
@@ -8,6 +8,8 @@
 2. 默认支持缓存特性, 可根据版本号自行缓存
 3. 提供 `--list-cache` 查看缓存, 支持通配符, 默认情况使用 `--list-cache *` 查看全部, 如需搜索如cowsay, 可直接 `--list-cache cowsay`
 4. 提供 `--delete-cache` 删除指定缓存, 支持通配符, 如需删除所有缓存 `--delete-cache *`, 删除指定缓存可以使用 `--delete-cache cowsay@1.1.1`, 在没有指定版本时默认删除@lastest.
+5. 缓存区域放置在 `${os.homedir()}/_npx`, 这样在 xpx 版本变更也不会清除缓存 (v0.1.2+)
+6. 修复 mac 无法使用 xpx 的问题 (v0.1.2+)
 
 ## SYNOPSIS
 

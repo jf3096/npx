@@ -200,9 +200,10 @@ function getEnv (opts) {
 
 function resolvePrefixPath (cache, packageName = '') {
   if (!cache) {
-    cache = path.resolve(__dirname, 'cache')
+    cache = os.homedir()
   }
-  return path.join(cache, '_npx', packageName)
+  const prefixFolder = path.join(cache, '_npx')
+  return path.join(prefixFolder, packageName)
 }
 
 module.exports._ensurePackages = ensurePackages
@@ -210,11 +211,14 @@ module.exports._ensurePackages = ensurePackages
 function ensurePackages (specs, opts) {
   return Promise.resolve().then(() => {
     const prefix = resolvePrefixPath(opts.cache, specs[0])
+    const bins = process.platform === 'win32'
+      ? prefix
+      : path.join(prefix, 'bin')
     let hasFinishInstalled = false
     if (fsExtra.existsSync(prefix)) {
       return {
         prefix: prefix,
-        bin: prefix
+        bin: bins
       }
     } else {
       fsExtra.ensureDirSync(prefix)
@@ -227,7 +231,7 @@ function ensurePackages (specs, opts) {
         process.env.PATH = `${prefix}${path.delimiter}${process.env.PATH}`
         if (!info) { info = {} }
         info.prefix = prefix
-        info.bin = prefix
+        info.bin = bins
         hasFinishInstalled = true
         return info
       })
